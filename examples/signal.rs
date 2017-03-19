@@ -3,7 +3,6 @@ extern crate slog;
 extern crate slog_term;
 extern crate slog_atomic;
 extern crate slog_json;
-extern crate slog_stream;
 extern crate nix;
 
 #[macro_use]
@@ -17,11 +16,11 @@ use std::time::Duration;
 use std::{thread, io};
 use slog::*;
 use slog_atomic::*;
-use slog_stream::*;
+use std::sync::Mutex;
 
 lazy_static! {
     // global atomic switch drain control
-    static ref ATOMIC_DRAIN_SWITCH : AtomicSwitchCtrl<io::Error> = AtomicSwitch::new(
+    static ref ATOMIC_DRAIN_SWITCH : AtomicSwitchCtrl<(), io::Error> = AtomicSwitch::new(
         Discard.map_err(|_| io::Error::new(io::ErrorKind::Other, "should no happen"))
     ).ctrl();
 
@@ -35,9 +34,15 @@ fn atomic_drain_switch() {
     ATOMIC_DRAIN_SWITCH_STATE.store(new, SeqCst);
 
     if new {
-        ATOMIC_DRAIN_SWITCH.set(stream(io::stdout(), slog_json::default()))
+        ATOMIC_DRAIN_SWITCH.set(Mutex::new(slog_json::Json::new(std::io::stderr()).build())
+                                    .map_err(|_| {
+                                                 io::Error::new(io::ErrorKind::Other, "mutex error")
+                                             }))
     } else {
-        ATOMIC_DRAIN_SWITCH.set(slog_term::streamer().full().stdout().build())
+        ATOMIC_DRAIN_SWITCH.set(Mutex::new(slog_term::term_full())
+                                .map_err(|_| io::Error::new(io::ErrorKind::Other, "mutex error"))
+                                )
+
     }
 }
 
@@ -53,8 +58,10 @@ fn main() {
         signal::sigaction(signal::SIGUSR1, &sig_action).unwrap();
     }
 
-    let drain = slog::duplicate(slog_term::streamer().stderr().full().build(), ATOMIC_DRAIN_SWITCH.drain()).fuse();
+    let drain = slog::Duplicate(slog_term::term_full(), ATOMIC_DRAIN_SWITCH.drain()).fuse();
 
+    let drain =
+        Mutex::new(drain).map_err(|_| io::Error::new(io::ErrorKind::Other, "mutex error")).fuse();
     atomic_drain_switch();
 
     let log = Logger::root(drain, o!());

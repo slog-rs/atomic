@@ -22,6 +22,6 @@
 
 [slog-rs]: //github.com/slog-rs/slog
 
-Using `slog-atomic` you can create a `slog::Drain` that can change behaviour
+Using `slog-atomic` you can create a `slog::Drain` that can change behavior
 in a thread-safe way, in runtime. This is useful eg. for triggering different
 logging levels from a signal handler.
