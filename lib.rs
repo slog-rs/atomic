@@ -16,23 +16,23 @@ use std::sync::Arc;
 use crossbeam::sync::ArcCell;
 
 /// Handle to `AtomicSwitch` that controls it.
-pub struct AtomicSwitchCtrl<O=(), E=slog::Never>(Arc<ArcCell<Box<Drain<Ok=O,Err=E>+Send+Sync>>>);
+pub struct AtomicSwitchCtrl<O=(), E=slog::Never>(Arc<ArcCell<Box<SendSyncRefUnwindSafeDrain<Ok=O,Err=E>>>>);
 
 /// Drain wrapping another drain, allowing atomic substitution in runtime
-pub struct AtomicSwitch<O=(), E=slog::Never>(Arc<ArcCell<Box<Drain<Ok=O,Err=E>+Send+Sync>>>);
+pub struct AtomicSwitch<O=(), E=slog::Never>(Arc<ArcCell<Box<SendSyncRefUnwindSafeDrain<Ok=O,Err=E>>>>);
 
 impl<O, E> AtomicSwitch<O, E> {
     /// Wrap `drain` in `AtomicSwitch` to allow swapping it later
     ///
     /// Use `AtomicSwitch::ctrl()` to get a handle to it
-    pub fn new<D: Drain<Ok = O, Err = E> + 'static + Send + Sync>(drain: D) -> Self {
-        AtomicSwitch::new_from_arc(Arc::new(ArcCell::new(Arc::new(Box::new(drain) as Box<Drain<Ok=O,Err=E>+Send+Sync>))))
+    pub fn new<D: SendSyncRefUnwindSafeDrain<Ok = O, Err = E> + 'static>(drain: D) -> Self {
+        AtomicSwitch::new_from_arc(Arc::new(ArcCell::new(Arc::new(Box::new(drain) as Box<SendSyncRefUnwindSafeDrain<Ok=O,Err=E>>))))
     }
 
     /// Create new `AtomicSwitch` from an existing `Arc<...>`
     ///
     /// See `AtomicSwitch::new()`
-    pub fn new_from_arc(d: Arc<ArcCell<Box<Drain<Ok = O, Err = E> + Send + Sync>>>) -> Self {
+    pub fn new_from_arc(d: Arc<ArcCell<Box<SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>>>) -> Self {
         AtomicSwitch(d)
     }
 
@@ -44,19 +44,19 @@ impl<O, E> AtomicSwitch<O, E> {
 
 impl<O, E> AtomicSwitchCtrl<O, E> {
     /// Get Arc to the currently wrapped drain
-    pub fn get(&self) -> Arc<Box<Drain<Ok = O, Err = E> + Send + Sync>> {
+    pub fn get(&self) -> Arc<Box<SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>> {
         self.0.get()
     }
 
     /// Set the current wrapped drain
-    pub fn set<D: Drain<Ok = O, Err = E> + Send + Sync>(&self, drain: D) {
+    pub fn set<D: SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>(&self, drain: D) {
         let _ = self.0.set(Arc::new(Box::new(drain)));
     }
 
     /// Swap the existing drain with a new one
     pub fn swap(&self,
-                drain: Arc<Box<Drain<Ok = O, Err = E> + Send + Sync>>)
-                -> Arc<Box<Drain<Ok = O, Err = E> + Send + Sync>> {
+                drain: Arc<Box<SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>>)
+                -> Arc<Box<SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>> {
         self.0.set(drain)
     }
 
