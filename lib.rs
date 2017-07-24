@@ -4,8 +4,7 @@
 //! runtime. This can be useful eg. for turning on debug logging
 //! in production.
 //!
-//! See [`slog` `signal.rs`
-//! example](https://github.com/dpc/slog-rs/blob/master/examples/signal.rs)
+//! See [`signal.rs` example](https://github.com/slog-rs/atomic/blob/master/examples/signal.rs).
 #![warn(missing_docs)]
 
 extern crate slog;
