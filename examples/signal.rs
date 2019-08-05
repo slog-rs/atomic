@@ -9,8 +9,7 @@ extern crate nix;
 extern crate lazy_static;
 
 use nix::sys::signal;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use std::{thread, io};
@@ -21,17 +20,21 @@ use std::sync::Mutex;
 lazy_static! {
     // global atomic switch drain control
     static ref ATOMIC_DRAIN_SWITCH : AtomicSwitchCtrl<(), io::Error> = AtomicSwitch::new(
-        Discard.map_err(|_| io::Error::new(io::ErrorKind::Other, "should no happen"))
+        Discard.map_err(|_| io::Error::new(io::ErrorKind::Other, "should not happen"))
     ).ctrl();
 
     // track current state of the atomic switch drain
     static ref ATOMIC_DRAIN_SWITCH_STATE : AtomicBool = AtomicBool::new(false);
+
+    // A flag set by a signal handler to please switch the logger
+    // (It can't be switched inside the signal handler, as that would use non async-signal-safe
+    // functions).
+    static ref SWITCH_SCHEDULED: AtomicBool = AtomicBool::new(false);
 }
 
 fn atomic_drain_switch() {
-    // XXX: Not atomic. Race?
-    let new = !ATOMIC_DRAIN_SWITCH_STATE.load(SeqCst);
-    ATOMIC_DRAIN_SWITCH_STATE.store(new, SeqCst);
+    // Negate in place and get the new value.
+    let new = !ATOMIC_DRAIN_SWITCH_STATE.fetch_nand(true, Ordering::Relaxed);
 
     if new {
         ATOMIC_DRAIN_SWITCH.set(Mutex::new(slog_json::Json::new(std::io::stderr()).build())
@@ -47,7 +50,7 @@ fn atomic_drain_switch() {
 }
 
 extern "C" fn handle_sigusr1(_: i32) {
-    atomic_drain_switch();
+    SWITCH_SCHEDULED.store(true, Ordering::Relaxed);
 }
 
 fn main() {
@@ -71,6 +74,10 @@ fn main() {
     let pid = nix::unistd::getpid();
     info!(log, "kill -SIGUSR1 {}", pid);
     loop {
+        if SWITCH_SCHEDULED.swap(false, Ordering::Relaxed) {
+            debug!(log, "Switching the logger");
+            atomic_drain_switch();
+        }
         info!(log, "tick");
         thread::sleep(Duration::from_millis(3000));
     }
