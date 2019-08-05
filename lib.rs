@@ -36,15 +36,8 @@ impl<O, E> AtomicSwitch<O, E> {
     ///
     /// Use `AtomicSwitch::ctrl()` to get a handle to it
     pub fn new<D: SendSyncRefUnwindSafeDrain<Ok = O, Err = E> + 'static>(drain: D) -> Self {
-        AtomicSwitch::new_from_arc(Arc::new(ArcSwap::from_pointee(Box::new(drain))))
-    }
+        AtomicSwitch(Arc::new(ArcSwap::from_pointee(Box::new(drain))))
 
-    // TODO: This one seems a bit fishy
-    /// Create new `AtomicSwitch` from an existing `Arc<...>`
-    ///
-    /// See `AtomicSwitch::new()`
-    pub fn new_from_arc(d: Arc<ArcSwap<Box<dyn SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>>>) -> Self {
-        AtomicSwitch(d)
     }
 
     /// Get a `AtomicSwitchCtrl` handle to control this `AtomicSwitch` drain
