@@ -15,24 +15,29 @@ use std::sync::Arc;
 use arc_swap::ArcSwap;
 use slog::*;
 
+type Inner<O, E> = Arc<ArcSwap<Box<dyn SendSyncRefUnwindSafeDrain<Ok=O,Err=E>>>>;
+
 /// Handle to `AtomicSwitch` that controls it.
-pub struct AtomicSwitchCtrl<O=(), E=slog::Never>(Arc<ArcSwap<Box<SendSyncRefUnwindSafeDrain<Ok=O,Err=E>>>>);
+pub struct AtomicSwitchCtrl<O=(), E=slog::Never>(Inner<O, E>);
 
 /// Drain wrapping another drain, allowing atomic substitution in runtime
-pub struct AtomicSwitch<O=(), E=slog::Never>(Arc<ArcSwap<Box<SendSyncRefUnwindSafeDrain<Ok=O,Err=E>>>>);
+pub struct AtomicSwitch<O=(), E=slog::Never>(Inner<O, E>);
+
+// TODO: Default?
 
 impl<O, E> AtomicSwitch<O, E> {
     /// Wrap `drain` in `AtomicSwitch` to allow swapping it later
     ///
     /// Use `AtomicSwitch::ctrl()` to get a handle to it
     pub fn new<D: SendSyncRefUnwindSafeDrain<Ok = O, Err = E> + 'static>(drain: D) -> Self {
-        AtomicSwitch::new_from_arc(Arc::new(ArcSwap::from_pointee(Box::new(drain) as Box<SendSyncRefUnwindSafeDrain<Ok=O,Err=E>>)))
+        AtomicSwitch::new_from_arc(Arc::new(ArcSwap::from_pointee(Box::new(drain))))
     }
 
+    // TODO: This one seems a bit fishy
     /// Create new `AtomicSwitch` from an existing `Arc<...>`
     ///
     /// See `AtomicSwitch::new()`
-    pub fn new_from_arc(d: Arc<ArcSwap<Box<SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>>>) -> Self {
+    pub fn new_from_arc(d: Arc<ArcSwap<Box<dyn SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>>>) -> Self {
         AtomicSwitch(d)
     }
 
@@ -44,7 +49,7 @@ impl<O, E> AtomicSwitch<O, E> {
 
 impl<O, E> AtomicSwitchCtrl<O, E> {
     /// Get Arc to the currently wrapped drain
-    pub fn get(&self) -> Arc<Box<SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>> {
+    pub fn get(&self) -> Arc<Box<dyn SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>> {
         self.0.load_full()
     }
 
@@ -55,8 +60,8 @@ impl<O, E> AtomicSwitchCtrl<O, E> {
 
     /// Swap the existing drain with a new one
     pub fn swap(&self,
-                drain: Arc<Box<SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>>)
-                -> Arc<Box<SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>> {
+                drain: Arc<Box<dyn SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>>)
+                -> Arc<Box<dyn SendSyncRefUnwindSafeDrain<Ok = O, Err = E>>> {
         self.0.swap(drain)
     }
 
