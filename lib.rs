@@ -83,4 +83,8 @@ impl<O, E> Drain for AtomicSwitch<O, E> {
     fn log(&self, info: &Record, kv: &OwnedKVList) -> std::result::Result<O, E> {
         self.0.load().log(info, kv)
     }
+
+    fn is_enabled(&self, level: Level) -> bool {
+        self.0.load().is_enabled(level)
+    }
 }
