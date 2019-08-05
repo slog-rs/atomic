@@ -18,12 +18,18 @@ use slog::*;
 type Inner<O, E> = Arc<ArcSwap<Box<dyn SendSyncRefUnwindSafeDrain<Ok=O,Err=E>>>>;
 
 /// Handle to `AtomicSwitch` that controls it.
+#[derive(Clone)]
 pub struct AtomicSwitchCtrl<O=(), E=slog::Never>(Inner<O, E>);
 
-/// Drain wrapping another drain, allowing atomic substitution in runtime
+/// Drain wrapping another drain, allowing atomic substitution in runtime.
+#[derive(Clone)]
 pub struct AtomicSwitch<O=(), E=slog::Never>(Inner<O, E>);
 
-// TODO: Default?
+impl Default for AtomicSwitch<(), slog::Never> {
+    fn default() -> Self {
+        Self::new(Discard)
+    }
+}
 
 impl<O, E> AtomicSwitch<O, E> {
     /// Wrap `drain` in `AtomicSwitch` to allow swapping it later
