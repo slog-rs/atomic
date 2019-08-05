@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+* Update dependencies
+* Make the structures Clone and provide Default implementation for the drain
+* Delegate the `Drain::is_enabled`
+* Remove the `AtomicSwitch::new_from_arc` (leaking internal details)
+
 ## 2.0.0 - 2017-04-29
 
 * Update dependencies
